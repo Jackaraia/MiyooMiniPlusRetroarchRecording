@@ -1,0 +1,53 @@
+name: Build RetroArch with FFmpeg Recording for Miyoo Mini
+
+on:
+  workflow_dispatch:
+    inputs:
+      debug_enabled:
+        type: boolean
+        description: 'Enable debug mode (keeps artifacts on failure)'
+        required: false
+        default: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout this repo
+      uses: actions/checkout@v3
+
+    - name: Set up build environment
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          build-essential \
+          git \
+          wget \
+          pkg-config \
+          nasm \
+          yasm
+
+    - name: Build everything in Docker
+      run: |
+        docker run --rm \
+          -v ${{ github.workspace }}:/workspace \
+          -e GITHUB_WORKSPACE=/workspace \
+          techdevangelist/miyoomini-buildroot:latest \
+          /bin/bash /workspace/scripts/build-all.sh
+
+    - name: Upload RetroArch Recording Build
+      uses: actions/upload-artifact@v3
+      with:
+        name: RetroArch-Recording-MiyooMini
+        path: output/*
+        if-no-files-found: error
+        retention-days: 90
+
+    - name: Upload FFmpeg Libraries
+      uses: actions/upload-artifact@v3  
+      with:
+        name: FFmpeg-Libraries-MiyooMini
+        path: ffmpeg-output/*
+        if-no-files-found: warn
+        retention-days: 90
