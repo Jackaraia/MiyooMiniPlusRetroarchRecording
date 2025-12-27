@@ -1,0 +1,38 @@
+--- libretro-super/libretro-buildbot-recipe.sh.orig	2024-01-01 00:00:00.000000000 +0000
++++ libretro-super/libretro-buildbot-recipe.sh	2024-01-01 00:00:01.000000000 +0000
+@@ -1683,7 +1683,21 @@
+ 			exit 1
+ 		fi
+ 
++		# ============================================
++		# FFmpeg Recording Support - Added by recording patch
++		# ============================================
++		echo 'Setting up FFmpeg for recording support...'
++		if [ -n "$FFMPEG_PREFIX" ] && [ -d "$FFMPEG_PREFIX" ]; then
++			export CFLAGS="$CFLAGS -I$FFMPEG_PREFIX/include"
++			export LDFLAGS="$LDFLAGS -L$FFMPEG_PREFIX/lib -Wl,-rpath,/mnt/SDCARD/RetroArch/lib"
++			export PKG_CONFIG_PATH="$FFMPEG_PREFIX/lib/pkgconfig:$PKG_CONFIG_PATH"
++			echo "FFmpeg prefix: $FFMPEG_PREFIX"
++			echo "Updated CFLAGS: $CFLAGS"
++			echo "Updated LDFLAGS: $LDFLAGS"
++		fi
++
+ 		echo 'building...'
+-		echo "BUILD CMD: ${HELPER} ${MAKE} -f Makefile.miyoomini -j${JOBS}"
++		echo "BUILD CMD: ${HELPER} ${MAKE} -f Makefile.miyoomini HAVE_FFMPEG=1 -j${JOBS}"
+ 		mkdir dist/
+-		${HELPER} ${MAKE} -f Makefile.miyoomini -j${JOBS} 2>&1 | tee -a "$LOGFILE"
++		${HELPER} ${MAKE} -f Makefile.miyoomini HAVE_FFMPEG=1 -j${JOBS} 2>&1 | tee -a "$LOGFILE"
+ 		cp retroarch dist/
+ 		${HELPER} ${MAKE} clean
+-		echo "BUILD CMD: ${HELPER} ${MAKE} -f Makefile.miyoomini_ml -j${JOBS}"
+-		${HELPER} ${MAKE} -f Makefile.miyoomini_ml -j${JOBS} 2>&1 | tee -a "$LOGFILE"
++		echo "BUILD CMD: ${HELPER} ${MAKE} -f Makefile.miyoomini_ml HAVE_FFMPEG=1 -j${JOBS}"
++		${HELPER} ${MAKE} -f Makefile.miyoomini_ml HAVE_FFMPEG=1 -j${JOBS} 2>&1 | tee -a "$LOGFILE"
+ 		${HELPER} ${MAKE} clean
+-		echo "BUILD CMD: ${HELPER} ${MAKE} -f Makefile.miyoomini_plus -j${JOBS}"
+-		${HELPER} ${MAKE} -f Makefile.miyoomini_plus -j${JOBS} 2>&1 | tee -a "$LOGFILE"
++		echo "BUILD CMD: ${HELPER} ${MAKE} -f Makefile.miyoomini_plus HAVE_FFMPEG=1 -j${JOBS}"
++		${HELPER} ${MAKE} -f Makefile.miyoomini_plus HAVE_FFMPEG=1 -j${JOBS} 2>&1 | tee -a "$LOGFILE"
+ 
+ 		status=$?
