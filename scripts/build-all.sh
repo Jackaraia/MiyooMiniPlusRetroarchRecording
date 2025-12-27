@@ -60,18 +60,17 @@ cd ffmpeg-src
     --disable-network \
     --disable-debug \
     --disable-stripping \
-    --disable-encoders \
-    --disable-decoders \
     --disable-hwaccels \
-    --disable-muxers \
-    --disable-demuxers \
     --disable-parsers \
     --disable-bsfs \
-    --disable-protocols \
     --disable-indevs \
     --disable-outdevs \
     --disable-devices \
-    --disable-filters \
+    --enable-swresample \
+    --enable-swscale \
+    --enable-avcodec \
+    --enable-avformat \
+    --enable-avutil \
     --enable-small \
     --enable-encoder=ffv1 \
     --enable-encoder=flac \
@@ -124,80 +123,73 @@ cd retroarch
 # Apply FFmpeg recording patch to Makefile.miyoomini
 echo "Applying FFmpeg patch to Makefile.miyoomini..."
 
-# Create the patch inline
-cat > /tmp/ffmpeg-recording.patch << 'PATCHEOF'
---- a/Makefile.miyoomini
-+++ b/Makefile.miyoomini
-@@ -1,5 +1,8 @@
- include Makefile.common
- 
-+# FFmpeg Recording Support
-+HAVE_FFMPEG ?= 0
-+
- TARGET := retroarch
- 
- SYSROOT := $(shell $(CC) --print-sysroot)
-@@ -8,6 +11,22 @@ CFLAGS += -marm -mtune=cortex-a7 -mfpu=neon-vfpv4 -mfloat-abi=hard -O3
- CFLAGS += -DRARCH_CONSOLE -DRARCH_INTERNAL -DDINGUX -DMIYOOMINI
- CFLAGS += -I$(SYSROOT)/usr/include/sdkdir -I$(SYSROOT)/usr/include/freetype2
- 
-+# FFmpeg Recording Support
-+ifeq ($(HAVE_FFMPEG), 1)
-+    FFMPEG_PREFIX ?= /opt/ffmpeg-miyoo
-+    CFLAGS += -DHAVE_FFMPEG
-+    CFLAGS += -I$(FFMPEG_PREFIX)/include
-+    LDFLAGS += -L$(FFMPEG_PREFIX)/lib
-+    LDFLAGS += -Wl,-rpath,/mnt/SDCARD/RetroArch/lib
-+    LIBS += -lavformat -lavcodec -lswresample -lswscale -lavutil -lm -lz
-+    
-+    # Add FFmpeg recording driver
-+    OBJ += record/drivers/record_ffmpeg.o
-+    
-+    DEFINES += -DHAVE_FFMPEG
-+    $(info FFmpeg recording support enabled)
-+endif
-+
- LDFLAGS += -L$(SYSROOT)/usr/lib -lmi_common -lmi_gfx -lmi_ao -lmi_sys
- LDFLAGS += -lpthread -lz -ldl -lrt -lpng -lfreetype
- LDFLAGS += -Wl,--gc-sections
-PATCHEOF
+# We need to:
+# 1. Add HAVE_FFMPEG flag and FFmpeg library linking
+# 2. Make sure only the recording driver is compiled, NOT the ffmpeg playback core
 
-# Apply patch (may need adjustment based on actual Makefile content)
-patch -p1 < /tmp/ffmpeg-recording.patch || {
-    echo "Patch failed, trying manual modification..."
-    
-    # Manual modification as fallback
-    # Add FFmpeg support after the include line
-    sed -i '/^include Makefile.common/a\
+# First, let's see what we're working with
+echo "Current Makefile.miyoomini contents (first 50 lines):"
+head -50 Makefile.miyoomini
+
+# Create a sed script to add FFmpeg support right after the include line
+# We're inserting the FFmpeg configuration block
+cat > /tmp/add_ffmpeg.sed << 'SEDSCRIPT'
+/^include Makefile.common/a\
 \
-# FFmpeg Recording Support\
+# FFmpeg Recording Support - Added by build script\
 HAVE_FFMPEG ?= 0\
 ifeq ($(HAVE_FFMPEG), 1)\
     FFMPEG_PREFIX ?= /opt/ffmpeg-miyoo\
     CFLAGS += -DHAVE_FFMPEG -I$(FFMPEG_PREFIX)/include\
     LDFLAGS += -L$(FFMPEG_PREFIX)/lib -Wl,-rpath,/mnt/SDCARD/RetroArch/lib\
-    LIBS += -lavformat -lavcodec -lswresample -lswscale -lavutil -lm -lz\
-    OBJ += record/drivers/record_ffmpeg.o\
+    LIBS += -lavformat -lavcodec -lswresample -lswscale -lavutil\
     DEFINES += -DHAVE_FFMPEG\
     $(info FFmpeg recording support enabled)\
-endif' Makefile.miyoomini
-}
+endif
+SEDSCRIPT
 
-# Do the same for Makefile.miyoomini_plus
-cp Makefile.miyoomini_plus Makefile.miyoomini_plus.bak
-sed -i '/^include Makefile.common/a\
-\
-# FFmpeg Recording Support\
-HAVE_FFMPEG ?= 0\
-ifeq ($(HAVE_FFMPEG), 1)\
-    FFMPEG_PREFIX ?= /opt/ffmpeg-miyoo\
-    CFLAGS += -DHAVE_FFMPEG -I$(FFMPEG_PREFIX)/include\
-    LDFLAGS += -L$(FFMPEG_PREFIX)/lib -Wl,-rpath,/mnt/SDCARD/RetroArch/lib\
-    LIBS += -lavformat -lavcodec -lswresample -lswscale -lavutil -lm -lz\
-    OBJ += record/drivers/record_ffmpeg.o\
-    DEFINES += -DHAVE_FFMPEG\
-    $(info FFmpeg recording support enabled)\
-endif' Makefile.miyoomini_plus
+sed -i -f /tmp/add_ffmpeg.sed Makefile.miyoomini
+sed -i -f /tmp/add_ffmpeg.sed Makefile.miyoomini_plus
+
+# Verify the changes
+echo ""
+echo "Modified Makefile.miyoomini (first 50 lines):"
+head -50 Makefile.miyoomini
+
+# Check what Makefile.common does with HAVE_FFMPEG
+echo ""
+echo "Checking Makefile.common for HAVE_FFMPEG handling..."
+grep -n "HAVE_FFMPEG\|record_ffmpeg\|ffmpeg_core" Makefile.common | head -30 || echo "No existing HAVE_FFMPEG in Makefile.common"
+
+# The problem is Makefile.common includes the FFmpeg playback CORE (libretro-ffmpeg)
+# when HAVE_FFMPEG is set, but we only want the RECORDING driver.
+# We need to:
+# 1. Keep HAVE_FFMPEG for the recording driver (record/drivers/record_ffmpeg.o)
+# 2. Disable the FFmpeg playback core (cores/libretro-ffmpeg/)
+
+# Check if there's a separate flag for the ffmpeg core
+echo ""
+echo "Looking for HAVE_FFMPEG_CORE or similar..."
+grep -n "ffmpeg.*core\|CORE.*ffmpeg" Makefile.common | head -10 || echo "No separate core flag found"
+
+# Let's look at how the ffmpeg core objects are added
+echo ""
+echo "Finding where ffmpeg_core.o is added..."
+grep -n "ffmpeg_core.o" Makefile.common | head -5 || echo "ffmpeg_core.o not found in Makefile.common"
+
+# Solution: We'll modify Makefile.common to NOT build the ffmpeg playback core
+# but still build the recording driver. We do this by commenting out the core objects.
+echo ""
+echo "Disabling FFmpeg playback core (keeping recording only)..."
+
+# Comment out the lines that add the ffmpeg playback core objects
+# These are typically in an ifeq ($(HAVE_FFMPEG), 1) block
+sed -i 's|^\(.*cores/libretro-ffmpeg/.*\.o.*\)$|# DISABLED: \1|g' Makefile.common
+
+# Verify the change
+echo ""
+echo "Verifying FFmpeg core is disabled..."
+grep -n "cores/libretro-ffmpeg" Makefile.common | head -10
 
 echo "Patch applied!"
 echo "::endgroup::"
