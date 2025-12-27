@@ -15,7 +15,7 @@ jobs:
     
     steps:
     - name: Checkout this repo
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
 
     - name: Set up build environment
       run: |
@@ -37,7 +37,7 @@ jobs:
           /bin/bash /workspace/scripts/build-all.sh
 
     - name: Upload RetroArch Recording Build
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: RetroArch-Recording-MiyooMini
         path: output/*
@@ -45,7 +45,7 @@ jobs:
         retention-days: 90
 
     - name: Upload FFmpeg Libraries
-      uses: actions/upload-artifact@v3  
+      uses: actions/upload-artifact@v4  
       with:
         name: FFmpeg-Libraries-MiyooMini
         path: ffmpeg-output/*
