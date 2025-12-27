@@ -1,0 +1,184 @@
+name: Build RetroArch with Recording Support via Docker
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-ra-recording:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Build FFmpeg and RetroArch with recording support
+      run: |
+        docker run \
+        -v ${{ github.workspace }}:/root/workspace \
+        techdevangelist/miyoomini-buildroot:latest /bin/bash -c "
+        set -e
+        
+        # ============================================
+        # STEP 1: Build FFmpeg for Miyoo Mini
+        # ============================================
+        echo '::group::Building FFmpeg'
+        cd /root
+        
+        # Install build dependencies
+        apt-get update
+        apt-get install -y nasm yasm pkg-config
+        
+        # Clone FFmpeg
+        git clone --depth 1 --branch n5.1.2 https://github.com/FFmpeg/FFmpeg.git ffmpeg-src
+        cd ffmpeg-src
+        
+        # Configure FFmpeg for cross-compilation
+        # We're building a minimal FFmpeg with just what we need for recording
+        ./configure \
+          --prefix=/root/ffmpeg-miyoo \
+          --cross-prefix=arm-linux-gnueabihf- \
+          --arch=arm \
+          --target-os=linux \
+          --cpu=cortex-a7 \
+          --enable-cross-compile \
+          --enable-shared \
+          --disable-static \
+          --disable-programs \
+          --disable-doc \
+          --disable-htmlpages \
+          --disable-manpages \
+          --disable-podpages \
+          --disable-txtpages \
+          --disable-network \
+          --disable-debug \
+          --disable-encoders \
+          --disable-decoders \
+          --disable-muxers \
+          --disable-demuxers \
+          --disable-parsers \
+          --disable-bsfs \
+          --disable-protocols \
+          --disable-devices \
+          --disable-filters \
+          --enable-encoder=ffv1 \
+          --enable-encoder=flac \
+          --enable-encoder=pcm_s16le \
+          --enable-encoder=libx264 \
+          --enable-decoder=ffv1 \
+          --enable-decoder=flac \
+          --enable-decoder=pcm_s16le \
+          --enable-muxer=matroska \
+          --enable-muxer=mp4 \
+          --enable-muxer=avi \
+          --enable-demuxer=matroska \
+          --enable-demuxer=avi \
+          --enable-protocol=file \
+          --enable-filter=aresample \
+          --enable-filter=scale \
+          --enable-gpl \
+          --enable-nonfree \
+          --extra-cflags='-marm -mtune=cortex-a7 -mfpu=neon-vfpv4 -mfloat-abi=hard -ffast-math -O2' \
+          --extra-ldflags='-marm -mtune=cortex-a7 -mfpu=neon-vfpv4 -mfloat-abi=hard'
+        
+        make -j\$(nproc)
+        make install
+        
+        echo 'FFmpeg built successfully!'
+        ls -la /root/ffmpeg-miyoo/lib/
+        echo '::endgroup::'
+        
+        # ============================================
+        # STEP 2: Build RetroArch with FFmpeg support
+        # ============================================
+        echo '::group::Building RetroArch'
+        cd /root/workspace
+        
+        # Initialize submodules
+        git submodule init
+        git submodule update
+        
+        # Apply existing patches
+        patch -p0 < buildbot-tweaks.patch
+        
+        # Apply our FFmpeg recording patch
+        patch -p0 < buildbot-ffmpeg-recording.patch
+        
+        # Set up environment for FFmpeg
+        export PKG_CONFIG_PATH=/root/ffmpeg-miyoo/lib/pkgconfig:\$PKG_CONFIG_PATH
+        export FFMPEG_PREFIX=/root/ffmpeg-miyoo
+        
+        # Run the build
+        cd libretro-super
+        ./libretro-buildbot-recipe.sh ../onionos-retroarch
+        
+        echo 'RetroArch built successfully!'
+        ls -lahR ./retroarch/dist/
+        echo '::endgroup::'
+        
+        # ============================================
+        # STEP 3: Package FFmpeg libraries
+        # ============================================
+        echo '::group::Packaging'
+        cd /root/workspace/libretro-super/retroarch
+        
+        # Create lib directory in dist
+        mkdir -p dist/lib
+        
+        # Copy FFmpeg shared libraries
+        cp -L /root/ffmpeg-miyoo/lib/libavcodec.so* dist/lib/
+        cp -L /root/ffmpeg-miyoo/lib/libavformat.so* dist/lib/
+        cp -L /root/ffmpeg-miyoo/lib/libavutil.so* dist/lib/
+        cp -L /root/ffmpeg-miyoo/lib/libswresample.so* dist/lib/
+        cp -L /root/ffmpeg-miyoo/lib/libswscale.so* dist/lib/
+        
+        # Create recording config
+        mkdir -p dist/.retroarch/records_config
+        cat > dist/.retroarch/records_config/FFV1-Lossless.cfg << 'RECORDCFG'
+# FFV1 Lossless Recording Config for Miyoo Mini
+# High quality, reasonable file size, perfect for editing
+
+format = matroska
+vcodec = ffv1
+acodec = flac
+
+# FFV1 settings
+video_crf = 0
+threads = 2
+RECORDCFG
+
+        cat > dist/.retroarch/records_config/H264-Small.cfg << 'RECORDCFG'
+# H264 Recording Config for Miyoo Mini  
+# Smaller files, good for sharing (requires more CPU)
+
+format = mp4
+vcodec = libx264
+acodec = aac
+
+video_preset = ultrafast
+video_crf = 23
+threads = 2
+scale_factor = 1
+RECORDCFG
+        
+        # Create a launcher script that sets up library path
+        cat > dist/retroarch_recording.sh << 'LAUNCHER'
+#!/bin/sh
+DIR=\$(dirname \"\$0\")
+export LD_LIBRARY_PATH=\"\$DIR/lib:\$LD_LIBRARY_PATH\"
+exec \"\$DIR/retroarch\" \"\$@\"
+LAUNCHER
+        chmod +x dist/retroarch_recording.sh
+        
+        echo 'Packaging complete!'
+        ls -lahR dist/
+        echo '::endgroup::'
+        "
+
+    - name: Upload the build artifacts
+      uses: actions/upload-artifact@v3.0.0
+      with:
+        name: RetroArch-Recording-Build
+        path: | 
+          libretro-super/retroarch/dist/*
+        if-no-files-found: error
+        retention-days: 90
