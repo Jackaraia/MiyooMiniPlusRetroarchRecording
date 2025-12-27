@@ -217,7 +217,7 @@ make clean
 # Build RetroArch for Miyoo Mini Plus
 echo "Building retroarch for Miyoo Mini Plus..."
 make -f Makefile.miyoomini_plus HAVE_FFMPEG=1 -j$(nproc)
-cp retroarch "${OUTPUT_DIR}/retroarch_miyoo354"
+cp retroarch_miyoo354 "${OUTPUT_DIR}/retroarch_miyoo354"
 make clean
 
 echo "RetroArch build complete!"
