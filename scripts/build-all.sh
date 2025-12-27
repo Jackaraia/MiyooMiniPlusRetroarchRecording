@@ -177,19 +177,24 @@ echo ""
 echo "Finding where ffmpeg_core.o is added..."
 grep -n "ffmpeg_core.o" Makefile.common | head -5 || echo "ffmpeg_core.o not found in Makefile.common"
 
-# Solution: We'll modify Makefile.common to NOT build the ffmpeg playback core
-# but still build the recording driver. We do this by commenting out the core objects.
-echo ""
-echo "Disabling FFmpeg playback core (keeping recording only)..."
+# The FFmpeg playback core IS required because HAVE_FFMPEG enables both recording
+# AND the built-in video player core. The core references libretro_ffmpeg_* functions.
+# We need to keep it, but fix the missing swresample include.
 
-# Comment out the lines that add the ffmpeg playback core objects
-# These are typically in an ifeq ($(HAVE_FFMPEG), 1) block
-sed -i 's|^\(.*cores/libretro-ffmpeg/.*\.o.*\)$|# DISABLED: \1|g' Makefile.common
-
-# Verify the change
 echo ""
-echo "Verifying FFmpeg core is disabled..."
-grep -n "cores/libretro-ffmpeg" Makefile.common | head -10
+echo "Fixing FFmpeg core to include swresample header..."
+
+# The ffmpeg_core.c file uses SwrContext but may not include the header
+# Let's add the include if it's missing
+if ! grep -q "libswresample/swresample.h" cores/libretro-ffmpeg/ffmpeg_core.c; then
+    echo "Adding swresample include to ffmpeg_core.c..."
+    sed -i '/#include.*libavformat/a #include <libswresample/swresample.h>' cores/libretro-ffmpeg/ffmpeg_core.c
+fi
+
+# Also check what headers are already included
+echo ""
+echo "Current FFmpeg includes in ffmpeg_core.c:"
+grep -n "#include.*lib" cores/libretro-ffmpeg/ffmpeg_core.c | head -10
 
 echo "Patch applied!"
 echo "::endgroup::"
