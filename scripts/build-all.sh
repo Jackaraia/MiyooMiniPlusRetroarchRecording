@@ -123,16 +123,11 @@ cd retroarch
 # Apply FFmpeg recording patch to Makefile.miyoomini
 echo "Applying FFmpeg patch to Makefile.miyoomini..."
 
-# We need to:
-# 1. Add HAVE_FFMPEG flag and FFmpeg library linking
-# 2. Make sure only the recording driver is compiled, NOT the ffmpeg playback core
-
 # First, let's see what we're working with
 echo "Current Makefile.miyoomini contents (first 50 lines):"
 head -50 Makefile.miyoomini
 
 # Create a sed script to add FFmpeg support right after the include line
-# We're inserting the FFmpeg configuration block
 cat > /tmp/add_ffmpeg.sed << 'SEDSCRIPT'
 /^include Makefile.common/a\
 \
@@ -161,22 +156,6 @@ echo ""
 echo "Checking Makefile.common for HAVE_FFMPEG handling..."
 grep -n "HAVE_FFMPEG\|record_ffmpeg\|ffmpeg_core" Makefile.common | head -30 || echo "No existing HAVE_FFMPEG in Makefile.common"
 
-# The problem is Makefile.common includes the FFmpeg playback CORE (libretro-ffmpeg)
-# when HAVE_FFMPEG is set, but we only want the RECORDING driver.
-# We need to:
-# 1. Keep HAVE_FFMPEG for the recording driver (record/drivers/record_ffmpeg.o)
-# 2. Disable the FFmpeg playback core (cores/libretro-ffmpeg/)
-
-# Check if there's a separate flag for the ffmpeg core
-echo ""
-echo "Looking for HAVE_FFMPEG_CORE or similar..."
-grep -n "ffmpeg.*core\|CORE.*ffmpeg" Makefile.common | head -10 || echo "No separate core flag found"
-
-# Let's look at how the ffmpeg core objects are added
-echo ""
-echo "Finding where ffmpeg_core.o is added..."
-grep -n "ffmpeg_core.o" Makefile.common | head -5 || echo "ffmpeg_core.o not found in Makefile.common"
-
 # The FFmpeg playback core IS required because HAVE_FFMPEG enables both recording
 # AND the built-in video player core. The core references libretro_ffmpeg_* functions.
 # We need to keep it, but fix the missing swresample include.
@@ -184,17 +163,31 @@ grep -n "ffmpeg_core.o" Makefile.common | head -5 || echo "ffmpeg_core.o not fou
 echo ""
 echo "Fixing FFmpeg core to include swresample header..."
 
-# The ffmpeg_core.c file uses SwrContext but may not include the header
-# Let's add the include if it's missing
-if ! grep -q "libswresample/swresample.h" cores/libretro-ffmpeg/ffmpeg_core.c; then
-    echo "Adding swresample include to ffmpeg_core.c..."
-    sed -i '/#include.*libavformat/a #include <libswresample/swresample.h>' cores/libretro-ffmpeg/ffmpeg_core.c
-fi
-
-# Also check what headers are already included
-echo ""
+# Show current includes
 echo "Current FFmpeg includes in ffmpeg_core.c:"
-grep -n "#include.*lib" cores/libretro-ffmpeg/ffmpeg_core.c | head -10
+grep -n "#include.*libav\|#include.*libsw" cores/libretro-ffmpeg/ffmpeg_core.c | head -15
+
+# The most reliable method: prepend the include to the file
+echo ""
+echo "Adding swresample include at the top of ffmpeg_core.c..."
+
+# Create temp file with the include, then append original content
+echo '#include <libswresample/swresample.h>' > /tmp/ffmpeg_core_fixed.c
+cat cores/libretro-ffmpeg/ffmpeg_core.c >> /tmp/ffmpeg_core_fixed.c
+mv /tmp/ffmpeg_core_fixed.c cores/libretro-ffmpeg/ffmpeg_core.c
+
+# Verify the fix
+echo ""
+echo "First 15 lines after fix:"
+head -15 cores/libretro-ffmpeg/ffmpeg_core.c
+
+# Double-check swresample is present
+if grep -q "libswresample/swresample.h" cores/libretro-ffmpeg/ffmpeg_core.c; then
+    echo "SUCCESS: swresample header added!"
+else
+    echo "WARNING: Could not add swresample header automatically"
+    head -50 cores/libretro-ffmpeg/ffmpeg_core.c
+fi
 
 echo "Patch applied!"
 echo "::endgroup::"
