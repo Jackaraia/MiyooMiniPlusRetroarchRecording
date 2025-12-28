@@ -118,33 +118,10 @@ echo "============================================"
 
 cd /tmp
 
-# First, let's see what branches are available on schmurtzm's repo
-echo "Checking available branches on schmurtzm/RetroArch-MiyoMini..."
-git ls-remote --heads https://github.com/schmurtzm/RetroArch-MiyoMini.git | head -20
-
-# Clone the repo and check for 1.14 branch
-git clone --depth 1 https://github.com/schmurtzm/RetroArch-MiyoMini.git retroarch
+# Clone the specific 1.14.0 branch directly
+echo "Cloning miyoomini-1.14.0 branch from schmurtzm/RetroArch-MiyoMini..."
+git clone --depth 1 --branch miyoomini-1.14.0 https://github.com/schmurtzm/RetroArch-MiyoMini.git retroarch
 cd retroarch
-
-# List all remote branches
-echo ""
-echo "Available branches:"
-git branch -r
-
-# Try to find a 1.14 branch, otherwise use miyoomini (main development branch)
-if git ls-remote --heads origin miyoomini-1.14.0 | grep -q miyoomini-1.14.0; then
-    echo "Found miyoomini-1.14.0 branch, switching..."
-    git fetch origin miyoomini-1.14.0
-    git checkout miyoomini-1.14.0
-elif git ls-remote --heads origin miyoomini | grep -q miyoomini; then
-    echo "Using miyoomini branch..."
-    git fetch origin miyoomini
-    git checkout miyoomini
-else
-    echo "Using default branch (miyoomini-1.16.0)..."
-    git fetch origin miyoomini-1.16.0
-    git checkout miyoomini-1.16.0
-fi
 
 echo ""
 echo "Current branch:"
