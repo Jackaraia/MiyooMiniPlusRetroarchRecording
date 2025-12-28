@@ -225,6 +225,12 @@ export PKG_CONFIG_PATH="${FFMPEG_PREFIX}/lib/pkgconfig:${PKG_CONFIG_PATH}"
 export CFLAGS="${CFLAGS} -I${FFMPEG_PREFIX}/include"
 export LDFLAGS="${LDFLAGS} -L${FFMPEG_PREFIX}/lib"
 
+# Build RetroArch for Miyoo Mini (standard)
+echo "Building retroarch (standard)..."
+make -f Makefile.miyoomini HAVE_FFMPEG=1 -j$(nproc)
+cp retroarch "${OUTPUT_DIR}/retroarch"
+make clean
+
 # Build RetroArch for Miyoo Mini Plus (only if Makefile exists)
 if [ -f Makefile.miyoomini_plus ]; then
     echo "Building retroarch for Miyoo Mini Plus..."
@@ -235,12 +241,6 @@ else
     echo "Makefile.miyoomini_plus not found - skipping Miyoo Mini Plus build"
     echo "Note: The standard retroarch binary may work on both devices"
 fi
-
-# Build RetroArch for Miyoo Mini Plus
-echo "Building retroarch for Miyoo Mini Plus..."
-make -f Makefile.miyoomini_plus HAVE_FFMPEG=1 -j$(nproc)
-cp retroarch_miyoo354 "${OUTPUT_DIR}/retroarch_miyoo354"
-make clean
 
 echo "RetroArch build complete!"
 echo "::endgroup::"
@@ -328,7 +328,7 @@ cat > INSTALL.md << 'INSTALL'
 
 2. **Copy new files to your SD card:**
    - Copy the `retroarch` binary to `/mnt/SDCARD/RetroArch/` (replacing the existing one)
-   - For Miyoo Mini Plus, use `retroarch_miyoo354` instead
+   - For Miyoo Mini Plus, use `retroarch_miyoo354` instead (if available)
    - Copy the entire `lib/` folder to `/mnt/SDCARD/RetroArch/lib/`
    - Copy `.retroarch/records_config/` to your `.retroarch` folder
 
@@ -375,7 +375,7 @@ cat > VERSION.txt << VERSION
 RetroArch Recording Build for Miyoo Mini
 Built: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
 FFmpeg: 5.1.4
-RetroArch Base: miyoomini-1.16.0
+RetroArch Base: miyoomini-1.14.0
 Recording Support: FFV1 + FLAC in MKV container
 VERSION
 
