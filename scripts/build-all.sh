@@ -118,9 +118,9 @@ echo "============================================"
 
 cd /tmp
 
-# Clone the specific 1.14.0 branch directly
-echo "Cloning miyoomini-1.14.0 branch from schmurtzm/RetroArch-MiyoMini..."
-git clone --depth 1 --branch miyoomini-1.14.0 https://github.com/schmurtzm/RetroArch-MiyoMini.git retroarch
+# Clone the 1.16.0 branch which has Makefile.miyoomini_plus for Miyoo Mini Plus
+echo "Cloning miyoomini-1.16.0 branch from schmurtzm/RetroArch-MiyoMini..."
+git clone --depth 1 --branch miyoomini-1.16.0 https://github.com/schmurtzm/RetroArch-MiyoMini.git retroarch
 cd retroarch
 
 echo ""
@@ -382,7 +382,7 @@ cat > VERSION.txt << VERSION
 RetroArch Recording Build for Miyoo Mini
 Built: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
 FFmpeg: 5.1.4
-RetroArch Base: miyoomini-1.14.0
+RetroArch Base: miyoomini-1.16.0
 Recording Support: FFV1 + FLAC in MKV container
 VERSION
 
