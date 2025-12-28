@@ -61,8 +61,6 @@ cd ffmpeg-src
     --disable-debug \
     --disable-stripping \
     --disable-hwaccels \
-    --disable-parsers \
-    --disable-bsfs \
     --disable-indevs \
     --disable-outdevs \
     --disable-devices \
@@ -71,28 +69,33 @@ cd ffmpeg-src
     --enable-avcodec \
     --enable-avformat \
     --enable-avutil \
-    --enable-small \
     --enable-encoder=ffv1 \
     --enable-encoder=flac \
     --enable-encoder=pcm_s16le \
     --enable-encoder=pcm_s16be \
     --enable-encoder=png \
+    --enable-encoder=rawvideo \
     --enable-decoder=ffv1 \
     --enable-decoder=flac \
     --enable-decoder=pcm_s16le \
     --enable-decoder=pcm_s16be \
     --enable-decoder=png \
+    --enable-decoder=rawvideo \
     --enable-muxer=matroska \
     --enable-muxer=avi \
     --enable-muxer=wav \
+    --enable-muxer=rawvideo \
     --enable-demuxer=matroska \
     --enable-demuxer=avi \
     --enable-demuxer=wav \
+    --enable-demuxer=rawvideo \
     --enable-protocol=file \
     --enable-filter=aresample \
     --enable-filter=scale \
     --enable-filter=null \
     --enable-filter=anull \
+    --enable-filter=format \
+    --enable-filter=aformat \
     --extra-cflags="${CFLAGS}" \
     --extra-ldflags="${LDFLAGS}" \
     --pkg-config=pkg-config
