@@ -117,8 +117,14 @@ echo "Step 2: Cloning and patching RetroArch"
 echo "============================================"
 
 cd /tmp
-git clone --depth 1 --branch miyoomini-1.16.0 https://github.com/schmurtzm/RetroArch-MiyoMini.git retroarch
+# Using OnionUI's RetroArch fork - this is what OnionOS actually ships
+git clone --depth 1 https://github.com/OnionUI/RetroArch.git retroarch
 cd retroarch
+
+# Check what branch/version we got
+echo "RetroArch version info:"
+head -20 version.h 2>/dev/null || head -5 retroarch.c
+git log --oneline -1
 
 # Apply FFmpeg recording patch to Makefile.miyoomini
 echo "Applying FFmpeg patch to Makefile.miyoomini..."
