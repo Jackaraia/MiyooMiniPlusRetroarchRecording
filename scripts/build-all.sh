@@ -137,20 +137,26 @@ echo "Applying FFmpeg patch to Makefile.miyoomini..."
 echo "Current Makefile.miyoomini contents (first 50 lines):"
 head -50 Makefile.miyoomini
 
-# Create a sed script to add FFmpeg support right after the include line
+# Create a sed script to add FFmpeg support BEFORE the include line
+# This is critical - HAVE_FFMPEG must be set before Makefile.common is processed
 cat > /tmp/add_ffmpeg.sed << 'SEDSCRIPT'
-/^include Makefile.common/a\
-\
+/^include Makefile.common/i\
 # FFmpeg Recording Support - Added by build script\
-HAVE_FFMPEG ?= 0\
-ifeq ($(HAVE_FFMPEG), 1)\
-    FFMPEG_PREFIX ?= /opt/ffmpeg-miyoo\
-    CFLAGS += -DHAVE_FFMPEG -I$(FFMPEG_PREFIX)/include\
-    LDFLAGS += -L$(FFMPEG_PREFIX)/lib -Wl,-rpath,/mnt/SDCARD/RetroArch/lib\
-    LIBS += -lavformat -lavcodec -lswresample -lswscale -lavutil\
-    DEFINES += -DHAVE_FFMPEG\
-    $(info FFmpeg recording support enabled)\
-endif
+# Must be set BEFORE include Makefile.common so it gets processed correctly\
+HAVE_FFMPEG ?= 1\
+FFMPEG_PREFIX ?= /opt/ffmpeg-miyoo\
+AVCODEC_CFLAGS = -I$(FFMPEG_PREFIX)/include\
+AVCODEC_LIBS = -L$(FFMPEG_PREFIX)/lib -lavcodec\
+AVFORMAT_CFLAGS = -I$(FFMPEG_PREFIX)/include\
+AVFORMAT_LIBS = -L$(FFMPEG_PREFIX)/lib -lavformat\
+AVUTIL_CFLAGS = -I$(FFMPEG_PREFIX)/include\
+AVUTIL_LIBS = -L$(FFMPEG_PREFIX)/lib -lavutil\
+SWSCALE_CFLAGS = -I$(FFMPEG_PREFIX)/include\
+SWSCALE_LIBS = -L$(FFMPEG_PREFIX)/lib -lswscale\
+SWRESAMPLE_CFLAGS = -I$(FFMPEG_PREFIX)/include\
+SWRESAMPLE_LIBS = -L$(FFMPEG_PREFIX)/lib -lswresample\
+FFMPEG_LIBS = -Wl,-rpath,/mnt/SDCARD/.tmp_update/lib\
+
 SEDSCRIPT
 
 sed -i -f /tmp/add_ffmpeg.sed Makefile.miyoomini
@@ -226,15 +232,16 @@ export CFLAGS="${CFLAGS} -I${FFMPEG_PREFIX}/include"
 export LDFLAGS="${LDFLAGS} -L${FFMPEG_PREFIX}/lib"
 
 # Build RetroArch for Miyoo Mini (standard)
+# HAVE_FFMPEG is already set to 1 in the patched Makefile
 echo "Building retroarch (standard)..."
-make -f Makefile.miyoomini HAVE_FFMPEG=1 -j$(nproc)
+make -f Makefile.miyoomini -j$(nproc)
 cp retroarch "${OUTPUT_DIR}/retroarch"
 make clean
 
 # Build RetroArch for Miyoo Mini Plus (only if Makefile exists)
 if [ -f Makefile.miyoomini_plus ]; then
     echo "Building retroarch for Miyoo Mini Plus..."
-    make -f Makefile.miyoomini_plus HAVE_FFMPEG=1 -j$(nproc)
+    make -f Makefile.miyoomini_plus -j$(nproc)
     cp retroarch_miyoo354 "${OUTPUT_DIR}/retroarch_miyoo354"
     make clean
 else
